@@ -1,18 +1,22 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { backendUrl } from '../App';
+import { FiLoader } from 'react-icons/fi';
 
 const Login = ({ setToken }) => {
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+    setError(''); // Clear error when user starts typing
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
     try {
       const res = await axios.post(`${backendUrl}/api/user/admin`, form);
@@ -20,7 +24,9 @@ const Login = ({ setToken }) => {
         setToken(res.data.token);
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+      setError(err.response?.data?.message || 'Invalid credentials. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -39,6 +45,7 @@ const Login = ({ setToken }) => {
               value={form.email}
               onChange={handleChange}
               className="w-full border border-amber-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              disabled={isLoading}
             />
           </div>
           <div>
@@ -50,14 +57,34 @@ const Login = ({ setToken }) => {
               value={form.password}
               onChange={handleChange}
               className="w-full border border-amber-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              disabled={isLoading}
             />
           </div>
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+          
+          {error && (
+            <div className="p-3 bg-red-50 text-red-600 text-sm rounded-md flex items-center">
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {error}
+            </div>
+          )}
+
           <button
             type="submit"
-            className="w-full bg-amber-600 text-white py-2 rounded font-medium hover:bg-amber-700 transition"
+            disabled={isLoading}
+            className={`w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-colors ${
+              isLoading ? 'opacity-75 cursor-not-allowed' : ''
+            }`}
           >
-            Login
+            {isLoading ? (
+              <>
+                <FiLoader className="animate-spin mr-2" />
+                Logging in...
+              </>
+            ) : (
+              'Login'
+            )}
           </button>
         </form>
       </div>
