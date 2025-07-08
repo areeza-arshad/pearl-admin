@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { backendUrl, currency } from '../App';
 import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
 
 const List = ({ token }) => {
   const [products, setProducts] = useState([]);
+  const navigate = useNavigate();
 
   const fetchProducts = async () => {
     try {
@@ -23,7 +25,6 @@ const List = ({ token }) => {
   const deleteProduct = async (id) => {
     if (!window.confirm("Are you sure you want to delete this product?")) return;
     try {
-      console.log("Token:", token);
       const res = await axios.post(`${backendUrl}/api/product/remove`, { id }, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -31,7 +32,7 @@ const List = ({ token }) => {
       });
       if (res.data.success) {
         toast.success("Product removed");
-        fetchProducts(); // refresh list
+        fetchProducts();
       }
     } catch (err) {
       console.error(err);
@@ -65,7 +66,7 @@ const List = ({ token }) => {
               <tr key={item._id} className="border-b hover:bg-gray-50">
                 <td className="p-4">
                   <img 
-                    src={Array.isArray(item.image) ? item.image[0] : item.image} 
+                    src={Array.isArray(item.image) && item.image.length > 0 ? item.image[0] : '/fallback-image.jpg'} 
                     alt={item.name} 
                     className="w-16 h-16 object-cover rounded" 
                   />
@@ -106,7 +107,7 @@ const List = ({ token }) => {
             <div key={item._id} className="bg-white p-4 rounded-lg shadow">
               <div className="flex items-start space-x-4">
                 <img 
-                  src={Array.isArray(item.image) ? item.image[0] : item.image} 
+                  src={Array.isArray(item.image) && item.image.length > 0 ? item.image[0] : '/fallback-image.jpg'} 
                   alt={item.name} 
                   className="w-20 h-20 object-cover rounded" 
                 />
@@ -118,12 +119,14 @@ const List = ({ token }) => {
                       <p className="text-gray-700">{currency} {item.price}</p>
                       <p className="text-sm text-gray-500">Stock: {item.stock}</p>
                     </div>
-                    <button
-                      onClick={() => deleteProduct(item._id)}
-                      className="text-red-600 hover:text-red-800 font-medium text-sm"
-                    >
-                      Delete
-                    </button>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => deleteProduct(item._id)}
+                        className="text-red-600 hover:text-red-800 font-medium text-sm"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -9,20 +9,21 @@ const Add = ({ token }) => {
     name: "",
     price: "",
     category: "",
-    newCategory: "", // New field for adding categories
+    newCategory: "",
     stock: "",
     bestseller: false,
     details: "",
+    description: "",
+    size: "",
     image1: null,
     image2: null,
     image3: null,
     image4: null,
   });
-  const [categories, setCategories] = useState([]); // Store fetched categories
+  const [categories, setCategories] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
 
-  // Fetch categories on mount
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -79,6 +80,18 @@ const Add = ({ token }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.image1) {
+      toast.error("At least one image is required.");
+      return;
+    }
+    if (form.details.trim().length < 10) {
+      toast.error("Product details must be at least 10 characters long.");
+      return;
+    }
+    if (form.description && form.description.trim().length < 20) {
+      toast.error("Product description, if provided, must be at least 20 characters long.");
+      return;
+    }
     setIsSubmitting(true);
 
     const formData = new FormData();
@@ -105,6 +118,8 @@ const Add = ({ token }) => {
         stock: "",
         bestseller: false,
         details: "",
+        description: "",
+        size: "",
         image1: null,
         image2: null,
         image3: null,
@@ -230,6 +245,20 @@ const Add = ({ token }) => {
               required
             />
           </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Size
+            </label>
+            <input
+              type="text"
+              name="size"
+              placeholder="Enter size (e.g., Small, Medium, Large)"
+              value={form.size}
+              onChange={handleInputChange}
+              className="w-full p-2 md:p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -238,12 +267,26 @@ const Add = ({ token }) => {
           </label>
           <textarea
             name="details"
-            placeholder="Enter product details"
+            placeholder="Enter product details (e.g., Size: Medium, Material: Cotton)"
             value={form.details}
             onChange={handleInputChange}
             rows="4"
             className="w-full p-2 md:p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             required
+          ></textarea>
+        </div>
+
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Product Description (Optional)
+          </label>
+          <textarea
+            name="description"
+            placeholder="Enter product description"
+            value={form.description}
+            onChange={handleInputChange}
+            rows="4"
+            className="w-full p-2 md:p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           ></textarea>
         </div>
 

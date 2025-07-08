@@ -7,6 +7,8 @@ import List from './pages/List';
 import Order from './pages/Order';
 import Offer from './pages/Offer';
 import Login from './components/Login';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export const backendUrl = import.meta.env.VITE_BACKEND_URL;
 export const currency = '₹';
@@ -18,7 +20,9 @@ const App = () => {
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
     if (savedToken) {
-      setToken(savedToken); // automatically login if token exists
+      setToken(savedToken); // auto-login if token exists
+    } else {
+      toast.warning("Please login first!");
     }
   }, []);
 
@@ -31,11 +35,12 @@ const App = () => {
   const handleLogout = () => {
     localStorage.removeItem('token');
     setToken('');
-    navigate('/'); // optional: redirect to login
+    navigate('/');
   };
 
   return (
     <div className="bg-gray-50 min-h-screen">
+      <ToastContainer />
       {token === '' ? (
         <Login setToken={setToken} />
       ) : (
