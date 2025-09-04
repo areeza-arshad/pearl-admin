@@ -65,6 +65,18 @@ const Sidebar = () => {
           <BiSolidCategory className="text-gray-800 text-3xl" />
           <p className="hidden md:block">Sub Category</p>
         </NavLink>
+
+         <NavLink
+          to="/testimonials"
+          className={({ isActive }) =>
+            `flex items-center gap-3 border border-gray-300 border-r-0 px-3 py-2 rounded-l-lg ${
+              isActive ? "bg-blue-100 font-medium" : ""
+            }`
+          }
+        >
+          <BiSolidCategory className="text-gray-800 text-3xl" />
+          <p className="hidden md:block">Happy Customers</p>
+        </NavLink>
       </div>
     </div>
   );

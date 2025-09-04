@@ -10,6 +10,7 @@ import ManageCategories from './pages/ManageCategories';
 import Edit from './pages/Edit';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import Testimonials from './pages/Testimonials';
 
 export const backendUrl = import.meta.env.VITE_BACKEND_URL;
 export const currency = '₹';
@@ -58,6 +59,7 @@ const App = () => {
                 <Route path="/offer" element={<Offer token={token} />} />
                 <Route path="/manage-categories" element={<ManageCategories token={token} />} />
                 <Route path="/edit/:id" element={<Edit token={token} />} />
+                <Route path="/testimonials" element={<Testimonials token={token} />} />
               </Routes>
             </div>
           </div>

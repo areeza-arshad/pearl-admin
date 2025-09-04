@@ -374,7 +374,7 @@ for (const color of form.colors) {
           setForm((prev) => ({
             ...prev,
             faqs: [...prev.faqs, faqInput],
-          }));
+          })); // i
           setFaqInput({ question: "", answer: "" });
         }
       }}
