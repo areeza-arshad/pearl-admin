@@ -1,37 +1,36 @@
-import React, { useState, useEffect } from "react";
+// Add.jsx
+import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { backendUrl } from "../App";
 import { toast } from "react-toastify";
+import { backendUrl } from "../App"; // adjust path if needed
 
 const Add = ({ token }) => {
- const [form, setForm] = useState({
-  name: "",
-  price: "",
-  category: "",
-  subcategory: "",
-  stock: "",
-  bestseller: false,
-  description: "",
-  details: [],
-  colors: [],
-  images: {},
-  faqs: [], // ✅ NEW
-});
-
+  const [form, setForm] = useState({
+    name: "",
+    price: "",
+    category: "",
+    subcategory: "",
+    stock: "",
+    bestseller: false,
+    description: "",
+    details: [],
+    colors: [],
+    images: {}, // { colorName: File }
+    faqs: [],
+  });
 
   const [colorInput, setColorInput] = useState("");
   const [detailInput, setDetailInput] = useState("");
+  const [faqInput, setFaqInput] = useState({ question: "", answer: "" });
   const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [faqInput, setFaqInput] = useState({ question: "", answer: "" });
-
 
   // Fetch categories
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         const res = await axios.get(`${backendUrl}/api/category/list`);
-        setCategories(res.data.categories);
+        setCategories(res.data.categories || []);
       } catch (err) {
         console.error("Error fetching categories:", err);
         toast.error("Failed to fetch categories");
@@ -48,75 +47,85 @@ const Add = ({ token }) => {
     }));
   };
 
-  // 🔹 Add bullet point detail
+  // Details (bullet points)
   const handleAddDetail = () => {
     const text = detailInput.trim();
     if (text && !form.details.includes(text)) {
-      setForm((prev) => ({
-        ...prev,
-        details: [...prev.details, text],
-      }));
+      setForm((prev) => ({ ...prev, details: [...prev.details, text] }));
       setDetailInput("");
     }
   };
+  const handleRemoveDetail = (d) =>
+    setForm((prev) => ({ ...prev, details: prev.details.filter((x) => x !== d) }));
 
-  // 🔹 Remove detail
-  const handleRemoveDetail = (detail) => {
-    setForm((prev) => ({
-      ...prev,
-      details: prev.details.filter((d) => d !== detail),
-    }));
-  };
-
-  // 🔹 Add color variant
+  // Colors
   const handleAddColor = () => {
     const color = colorInput.trim().toLowerCase();
-    if (color && !form.colors.includes(color)) {
-      setForm((prev) => ({
-        ...prev,
-        colors: [...prev.colors, color],
-      }));
-      setColorInput("");
+    if (!color) return;
+    if (!form.colors.includes(color)) {
+      setForm((prev) => ({ ...prev, colors: [...prev.colors, color] }));
     }
+    setColorInput("");
   };
-
-  // 🔹 Add image for a color
-  const handleImageChange = (color, file) => {
-    setForm((prev) => ({
-      ...prev,
-      images: {
-        ...prev.images,
-        [color]: file,
-      },
-    }));
-  };
-
-  // 🔹 Remove color
   const handleRemoveColor = (color) => {
     setForm((prev) => {
-      const updatedColors = prev.colors.filter((c) => c !== color);
-      const updatedImages = { ...prev.images };
-      delete updatedImages[color];
+      const images = { ...prev.images };
+      delete images[color];
       return {
         ...prev,
-        colors: updatedColors,
-        images: updatedImages,
+        colors: prev.colors.filter((c) => c !== color),
+        images,
       };
     });
   };
 
-  const handleSubmit = async (e) => {
+  // File change (allow any file type)
+  const handleImageChange = (color, file) => {
+  if (!file) {
+    console.log("No file selected for color", color);
+    return;
+  }
+  console.log("Selected file for", color, "->", file.name, file.type, file.size);
+  setForm((prev) => ({
+    ...prev,
+    images: {
+      ...prev.images,
+      [color]: file,
+    },
+  }));
+};
+
+
+
+  const handleRemoveFileForColor = (color) => {
+    setForm((prev) => {
+      const images = { ...prev.images };
+      delete images[color];
+      return { ...prev, images };
+    });
+  };
+
+  // FAQs
+  const handleAddFaq = () => {
+    if (!faqInput.question || !faqInput.answer) return;
+    setForm((prev) => ({ ...prev, faqs: [...prev.faqs, faqInput] }));
+    setFaqInput({ question: "", answer: "" });
+  };
+  const handleRemoveFaq = (idx) =>
+    setForm((prev) => ({ ...prev, faqs: prev.faqs.filter((_, i) => i !== idx) }));
+
+  // Submit
+const handleSubmit = async (e) => {
   e.preventDefault();
   setIsLoading(true);
 
   try {
     const formData = new FormData();
 
-    // Basic fields (exclude arrays & files)
-    const skipKeys = ["colors", "images", "details", "faqs"];
+    // Append simple scalar fields (skip arrays & files)
+    const skipKeys = ["colors", "images", "details", "faqs", "variants", "sizes"];
     Object.entries(form).forEach(([key, value]) => {
       if (!skipKeys.includes(key)) {
-        // Convert booleans/numbers to string
         formData.append(key, value === undefined || value === null ? "" : String(value));
       }
     });
@@ -125,34 +134,54 @@ const Add = ({ token }) => {
     formData.append("details", JSON.stringify(form.details || []));
     formData.append("faqs", JSON.stringify(form.faqs || []));
     formData.append("colors", JSON.stringify(form.colors || []));
+    // If your backend expects `variants` as JSON, build it here:
+    // For example variants may be [{ color: 'red', stock: 10 }, ...]
+    // If you already build variants on client, append that. Otherwise create simple variants from colors:
+    const variantsPayload = (form.colors || []).map((color, idx) => ({
+      color,
+      stock: 0,
+    }));
+    formData.append("variants", JSON.stringify(variantsPayload));
 
-    // Append images as images[] + imageColors[] so backend can map them
-    // (This is a common expected format; adjust keys if your backend uses different names)
-    for (const color of form.colors || []) {
-      const file = form.images[color];
-      if (file) {
-        formData.append("images[]", file);
-        formData.append("imageColors[]", color);
+    // Append GENERAL product images as image1..image4 (if any)
+    // If you have a UI to upload separate general images, collect them e.g. form.generalImages = [File,...]
+    // Here we attempt to use first N files from form.images if you haven't separate fields.
+    // But safest: if you have dedicated inputs, append them here directly to image1..image4.
+    // Example: append image1..image4 only if form.generalImages exists:
+    if (form.generalImages && Array.isArray(form.generalImages)) {
+      for (let i = 0; i < Math.min(4, form.generalImages.length); i++) {
+        formData.append(`image${i + 1}`, form.generalImages[i]); // image1..image4
       }
     }
 
-    // DEBUG: show keys being sent (do NOT keep in prod)
-    for (const pair of formData.entries()) {
-      console.log("FormData entry:", pair[0], pair[1]);
+    // Append VARIANT IMAGES as variantImage0, variantImage1, ...
+    // Order must match variantsPayload order (i.e., form.colors order)
+    for (let i = 0; i < (form.colors || []).length; i++) {
+      const color = form.colors[i];
+      const file = form.images[color];
+      if (file) {
+        formData.append(`variantImage${i}`, file); // variantImage0, variantImage1, ...
+        console.log("Appended variantImage" + i, file.name, "for color", color);
+      } else {
+        console.log("No file for variant index", i, "color", color);
+      }
     }
 
-    // IMPORTANT: Do NOT set Content-Type manually. Let axios/browser set multipart boundary.
-    const res = await axios.post(`${backendUrl}/api/product/add`, formData, {
+    // Debug: show what will be sent
+    for (const pair of formData.entries()) {
+      console.log("FormData:", pair[0], pair[1]);
+    }
+
+    const response = await axios.post(`${backendUrl}/api/product/add`, formData, {
       headers: {
         Authorization: `Bearer ${token}`,
-        // "Content-Type": "multipart/form-data", // <- remove this
+        // DO NOT set Content-Type manually
       },
+      timeout: 120000,
     });
 
-    console.log("Add product success:", res.status, res.data);
-    toast.success(res.data?.message || "Product added successfully!");
-
-    // Reset form (include faqs)
+    toast.success(response.data?.message || "Product added successfully!");
+    // Reset form (same as your existing reset)
     setForm({
       name: "",
       price: "",
@@ -166,20 +195,13 @@ const Add = ({ token }) => {
       images: {},
       faqs: [],
     });
-  } catch (error) {
-    // Log everything useful
-    console.error("Error submitting form - full error:", error);
-    if (error.response) {
-      console.error("Error response status:", error.response.status);
-      console.error("Error response data:", error.response.data);
-      // show server-provided message if any
-      const serverMsg =
-        error.response.data?.message ||
-        error.response.data?.error ||
-        (typeof error.response.data === "string" ? error.response.data : null);
-      toast.error(serverMsg || `Failed to add product (status ${error.response.status})`);
+  } catch (err) {
+    console.error("Error submitting form - full error:", err);
+    if (err.response) {
+      console.error("Server response:", err.response.status, err.response.data);
+      toast.error(err.response.data?.message || `Failed (${err.response.status})`);
     } else {
-      toast.error(error.message || "Failed to add product");
+      toast.error(err.message || "Network error");
     }
   } finally {
     setIsLoading(false);
@@ -187,14 +209,12 @@ const Add = ({ token }) => {
 };
 
 
-
-
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white rounded-xl shadow-lg">
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Add New Product</h2>
+
       <form onSubmit={handleSubmit} className="space-y-6">
-        
-        {/* Basic Information */}
+        {/* Basic */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium">Product Name*</label>
@@ -206,7 +226,6 @@ const Add = ({ token }) => {
               required
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium">Price*</label>
             <input
@@ -219,7 +238,6 @@ const Add = ({ token }) => {
             />
           </div>
 
-          {/* Category Dropdown */}
           <div>
             <label className="block text-sm font-medium">Category*</label>
             <select
@@ -238,7 +256,6 @@ const Add = ({ token }) => {
             </select>
           </div>
 
-          {/* Subcategory Dropdown */}
           <div>
             <label className="block text-sm font-medium">Subcategory</label>
             <select
@@ -250,9 +267,9 @@ const Add = ({ token }) => {
             >
               <option value="">Select Subcategory</option>
               {categories
-                .find((cat) => cat.name === form.category)
-                ?.subcategories.map((sub, idx) => (
-                  <option key={idx} value={sub}>
+                .find((c) => c.name === form.category)
+                ?.subcategories.map((sub, i) => (
+                  <option key={i} value={sub}>
                     {sub}
                   </option>
                 ))}
@@ -296,33 +313,125 @@ const Add = ({ token }) => {
           />
         </div>
 
-        {/* Product Details (Bullet Points) */}
+        {/* Details */}
         <div>
-          <label className="block text-sm font-medium mb-2">Product Details*</label>
+          <label className="block text-sm font-medium mb-2">Product Details</label>
           <div className="flex gap-2 mb-3">
             <input
               type="text"
+              placeholder="Slim fit, 100% cotton..."
+              className="flex-1 p-3 border rounded-lg"
               value={detailInput}
               onChange={(e) => setDetailInput(e.target.value)}
-              placeholder="Enter a detail (e.g., Slim fit)"
-              className="flex-1 p-3 border rounded-lg"
             />
-            <button
-              type="button"
-              onClick={handleAddDetail}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg"
-            >
+            <button type="button" onClick={handleAddDetail} className="bg-blue-600 text-white px-4 py-2 rounded-lg">
               Add
             </button>
           </div>
-
           <ul className="list-disc list-inside space-y-1">
-            {form.details.map((detail, idx) => (
-              <li key={idx} className="flex justify-between items-center">
-                <span>{detail}</span>
+            {form.details.map((d, i) => (
+              <li key={i} className="flex justify-between items-center">
+                <span>{d}</span>
+                <button type="button" onClick={() => handleRemoveDetail(d)} className="text-red-500 text-sm">
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Colors & Media */}
+        <div>
+          <label className="block text-sm font-medium mb-2">Color Variants</label>
+
+          <div className="flex items-center gap-2 mb-4">
+            <input
+              type="text"
+              value={colorInput}
+              onChange={(e) => setColorInput(e.target.value)}
+              placeholder="Enter color name (e.g., gold, black)"
+              className="flex-1 p-3 border rounded-lg"
+            />
+            <button type="button" onClick={handleAddColor} className="bg-blue-600 text-white px-4 py-2 rounded-lg">
+              Add Color
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {form.colors.map((color) => {
+              const file = form.images[color];
+              return (
+                <div key={color} className="border p-4 rounded-lg">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="capitalize font-medium">{color}</span>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => handleRemoveColor(color)} className="text-red-500 text-sm">
+                        Remove Color
+                      </button>
+                    </div>
+                  </div>
+
+                  <label className="block text-sm mb-2">Attach file for {color}</label>
+                 <input
+  type="file"
+  accept=".jpg,.jpeg,.png,.webp,.gif,image/*"
+  onChange={(e) => handleImageChange(color, e.target.files?.[0])}
+  className="block w-full text-sm mb-2"
+/>
+
+                  {file ? (
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm">
+                        <div className="font-medium">{file.name}</div>
+                        <div className="text-xs text-gray-500">{file.type || "unknown type"}</div>
+                        <div className="text-xs text-gray-500"> {(file.size / 1024).toFixed(1)} KB</div>
+                      </div>
+                      <button type="button" onClick={() => handleRemoveFileForColor(color)} className="text-red-500 text-sm">
+                        Remove File
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-500">No file selected</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* FAQs */}
+        <div>
+          <label className="block text-sm font-medium mb-2">FAQs (optional)</label>
+          <div className="flex flex-col gap-2 mb-3">
+            <input
+              type="text"
+              placeholder="Question"
+              value={faqInput.question}
+              onChange={(e) => setFaqInput({ ...faqInput, question: e.target.value })}
+              className="p-2 border rounded"
+            />
+            <input
+              type="text"
+              placeholder="Answer"
+              value={faqInput.answer}
+              onChange={(e) => setFaqInput({ ...faqInput, answer: e.target.value })}
+              className="p-2 border rounded"
+            />
+            <button type="button" onClick={handleAddFaq} className="bg-blue-600 text-white px-4 py-2 rounded">
+              Add FAQ
+            </button>
+          </div>
+
+          <ul className="space-y-2">
+            {form.faqs.map((fq, idx) => (
+              <li key={idx} className="border p-2 rounded flex justify-between items-start">
+                <div>
+                  <p className="font-semibold">{fq.question}</p>
+                  <p className="text-sm text-gray-600">{fq.answer}</p>
+                </div>
                 <button
                   type="button"
-                  onClick={() => handleRemoveDetail(detail)}
+                  onClick={() => handleRemoveFaq(idx)}
                   className="text-red-500 text-sm"
                 >
                   Remove
@@ -332,122 +441,12 @@ const Add = ({ token }) => {
           </ul>
         </div>
 
-        {/* Color Variants */}
-        <div>
-          <label className="block text-sm font-medium mb-2">Color Variants*</label>
-          <div className="flex items-center gap-2 mb-4">
-            <input
-              type="text"
-              value={colorInput}
-              onChange={(e) => setColorInput(e.target.value)}
-              placeholder="Enter color name (e.g., gold, silver)"
-              className="flex-1 p-3 border rounded-lg"
-            />
-            <button
-              type="button"
-              onClick={handleAddColor}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg"
-            >
-              Add Color
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {form.colors.map((color) => (
-              <div key={color} className="border p-4 rounded-lg">
-                <div className="flex justify-between items-center mb-3">
-                  <span className="capitalize font-medium">{color}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveColor(color)}
-                    className="text-red-500 text-sm"
-                  >
-                    Remove
-                  </button>
-                </div>
-                <label className="block text-sm mb-2">Image for {color}*</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleImageChange(color, e.target.files[0])}
-                  className="block w-full text-sm"
-                  required
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* FAQs */}
-<div>
-  <label className="block text-sm font-medium mb-2">FAQs</label>
-  <div className="flex flex-col gap-2 mb-3">
-    <input
-      type="text"
-      placeholder="Question"
-      value={faqInput.question}
-      onChange={(e) => setFaqInput({ ...faqInput, question: e.target.value })}
-      className="p-2 border rounded"
-    />
-    <input
-      type="text"
-      placeholder="Answer"
-      value={faqInput.answer}
-      onChange={(e) => setFaqInput({ ...faqInput, answer: e.target.value })}
-      className="p-2 border rounded"
-    />
-    <button
-      type="button"
-      onClick={() => {
-        if (faqInput.question && faqInput.answer) {
-          setForm((prev) => ({
-            ...prev,
-            faqs: [...prev.faqs, faqInput],
-          })); // i
-          setFaqInput({ question: "", answer: "" });
-        }
-      }}
-      className="bg-blue-600 text-white px-4 py-2 rounded"
-    >
-      Add FAQ
-    </button>
-  </div>
-
-  <ul className="space-y-2">
-    {form.faqs.map((faq, idx) => (
-      <li key={idx} className="border p-2 rounded flex justify-between items-start">
-        <div>
-          <p className="font-semibold">{faq.question}</p>
-          <p className="text-sm text-gray-600">{faq.answer}</p>
-        </div>
-        <button
-          type="button"
-          onClick={() =>
-            setForm((prev) => ({
-              ...prev,
-              faqs: prev.faqs.filter((_, i) => i !== idx),
-            }))
-          }
-          className="text-red-500 text-sm"
-        >
-          Remove
-        </button>
-      </li>
-    ))}
-  </ul>
-</div>
-
-
         {/* Submit */}
         <div className="pt-4">
           <button
             type="submit"
-            disabled={isLoading || form.colors.length === 0}
-            className={`w-full py-3 px-6 rounded-lg font-medium text-white ${
-              isLoading || form.colors.length === 0
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-green-600 hover:bg-green-700"
-            }`}
+            disabled={isLoading}
+            className={`w-full py-3 px-6 rounded-lg font-medium text-white ${isLoading ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"}`}
           >
             {isLoading ? "Processing..." : "Add Product"}
           </button>
