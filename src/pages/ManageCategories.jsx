@@ -55,21 +55,24 @@ const ManageCategories = ({ token }) => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-6 bg-white rounded-lg shadow-md">
+    <div className="max-w-3xl mx-auto p-4 sm:p-6 bg-white rounded-lg shadow-md">
       <h2 className="text-xl font-bold mb-4">Manage Categories</h2>
 
       {/* Add Category */}
       <div className="mb-6">
         <h3 className="font-medium mb-2">Add Category</h3>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <input
             value={categoryName}
             onChange={(e) => setCategoryName(e.target.value)}
             placeholder="Category name"
-            className="flex-1 border p-2 rounded"
+            className="col-span-1 sm:col-span-2 border p-2 rounded"
           />
-          <button onClick={handleAddCategory} className="bg-green-600 text-white px-4 rounded">
-            Add
+          <button 
+            onClick={handleAddCategory} 
+            className="bg-green-600 text-white p-2 rounded hover:bg-green-700 transition-colors"
+          >
+            Add Category
           </button>
         </div>
       </div>
@@ -77,11 +80,11 @@ const ManageCategories = ({ token }) => {
       {/* Add Subcategory */}
       <div className="mb-6">
         <h3 className="font-medium mb-2">Add Subcategory</h3>
-        <div className="flex gap-2 mb-2">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="flex-1 border p-2 rounded"
+            className="col-span-1 sm:col-span-2 border p-2 rounded"
           >
             <option value="">Select Category</option>
             {categories.map((cat) => (
@@ -94,10 +97,13 @@ const ManageCategories = ({ token }) => {
             value={subcategory}
             onChange={(e) => setSubcategory(e.target.value)}
             placeholder="Subcategory name"
-            className="flex-1 border p-2 rounded"
+            className="col-span-1 sm:col-span-1 border p-2 rounded"
           />
-          <button onClick={handleAddSubcategory} className="bg-blue-600 text-white px-4 rounded">
-            Add
+          <button 
+            onClick={handleAddSubcategory} 
+            className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition-colors"
+          >
+            Add Subcategory
           </button>
         </div>
       </div>
@@ -105,14 +111,16 @@ const ManageCategories = ({ token }) => {
       {/* Category List */}
       <div>
         <h3 className="font-medium mb-2">Existing Categories</h3>
-        <ul className="space-y-2">
+        <ul className="space-y-3">
           {categories.map((cat) => (
             <li key={cat._id} className="border p-3 rounded">
-              <strong>{cat.name}</strong>
+              <strong className="text-lg">{cat.name}</strong>
               {cat.subcategories.length > 0 && (
-                <ul className="ml-4 list-disc text-gray-600">
+                <ul className="mt-2 ml-2 sm:ml-4 space-y-1">
                   {cat.subcategories.map((sub, idx) => (
-                    <li key={idx}>{sub}</li>
+                    <li key={idx} className="text-gray-600 bg-gray-50 p-2 rounded">
+                      {sub}
+                    </li>
                   ))}
                 </ul>
               )}

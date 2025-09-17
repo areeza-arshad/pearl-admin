@@ -280,14 +280,18 @@ const Add = ({ token }) => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white rounded-xl shadow-lg">
+    <div className="max-w-4xl mx-auto p-4 sm:p-6 bg-white rounded-xl shadow-lg">
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Add New Product</h2>
 
       <form onSubmit={handleSubmit} encType="multipart/form-data" className="space-y-6">
-        {/* Basic */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Basic Information */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          <div className="md:col-span-2">
+            <h3 className="text-lg font-medium text-gray-700 mb-3">Basic Information</h3>
+          </div>
+          
           <div>
-            <label className="block text-sm font-medium">Product Name*</label>
+            <label className="block text-sm font-medium mb-1">Product Name*</label>
             <input
               name="name"
               value={form.name}
@@ -296,8 +300,9 @@ const Add = ({ token }) => {
               required
             />
           </div>
+          
           <div>
-            <label className="block text-sm font-medium">Price*</label>
+            <label className="block text-sm font-medium mb-1">Price*</label>
             <input
               name="price"
               type="number"
@@ -309,7 +314,7 @@ const Add = ({ token }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium">Category*</label>
+            <label className="block text-sm font-medium mb-1">Category*</label>
             <select
               name="category"
               value={form.category}
@@ -327,7 +332,7 @@ const Add = ({ token }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium">Subcategory</label>
+            <label className="block text-sm font-medium mb-1">Subcategory</label>
             <select
               name="subcategory"
               value={form.subcategory}
@@ -347,7 +352,7 @@ const Add = ({ token }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium">Stock*</label>
+            <label className="block text-sm font-medium mb-1">Stock*</label>
             <input
               name="stock"
               type="number"
@@ -359,7 +364,7 @@ const Add = ({ token }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium">Size</label>
+            <label className="block text-sm font-medium mb-1">Size</label>
             <input
               name="size"
               value={form.size}
@@ -368,7 +373,7 @@ const Add = ({ token }) => {
             />
           </div>
 
-          <div className="flex items-center">
+          <div className="flex items-center md:col-span-2">
             <input
               type="checkbox"
               name="bestseller"
@@ -382,7 +387,7 @@ const Add = ({ token }) => {
 
         {/* Description */}
         <div>
-          <label className="block text-sm font-medium">Description*</label>
+          <label className="block text-sm font-medium mb-1">Description*</label>
           <textarea
             name="description"
             value={form.description}
@@ -396,7 +401,7 @@ const Add = ({ token }) => {
         {/* Details */}
         <div>
           <label className="block text-sm font-medium mb-2">Product Details</label>
-          <div className="flex gap-2 mb-3">
+          <div className="flex flex-col sm:flex-row gap-2 mb-3">
             <input
               type="text"
               placeholder="Slim fit, 100% cotton..."
@@ -404,15 +409,23 @@ const Add = ({ token }) => {
               value={detailInput}
               onChange={(e) => setDetailInput(e.target.value)}
             />
-            <button type="button" onClick={handleAddDetail} className="bg-blue-600 text-white px-4 py-2 rounded-lg">
-              Add
+            <button 
+              type="button" 
+              onClick={handleAddDetail} 
+              className="bg-blue-600 text-white px-4 py-3 sm:py-2 rounded-lg"
+            >
+              Add Detail
             </button>
           </div>
-          <ul className="list-disc list-inside space-y-1">
+          <ul className="space-y-2">
             {form.details.map((d, i) => (
-              <li key={i} className="flex justify-between items-center">
+              <li key={i} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
                 <span>{d}</span>
-                <button type="button" onClick={() => handleRemoveDetail(d)} className="text-red-500 text-sm">
+                <button 
+                  type="button" 
+                  onClick={() => handleRemoveDetail(d)} 
+                  className="text-red-500 text-sm px-2 py-1"
+                >
                   Remove
                 </button>
               </li>
@@ -424,7 +437,7 @@ const Add = ({ token }) => {
         <div>
           <label className="block text-sm font-medium mb-2">Color Variants</label>
 
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex flex-col sm:flex-row gap-2 mb-4">
             <input
               type="text"
               value={colorInput}
@@ -432,7 +445,11 @@ const Add = ({ token }) => {
               placeholder="Enter color name (e.g., gold, black)"
               className="flex-1 p-3 border rounded-lg"
             />
-            <button type="button" onClick={handleAddColor} className="bg-blue-600 text-white px-4 py-2 rounded-lg">
+            <button 
+              type="button" 
+              onClick={handleAddColor} 
+              className="bg-blue-600 text-white px-4 py-3 sm:py-2 rounded-lg"
+            >
               Add Color
             </button>
           </div>
@@ -444,11 +461,13 @@ const Add = ({ token }) => {
                 <div key={color} className="border p-4 rounded-lg">
                   <div className="flex justify-between items-center mb-3">
                     <span className="capitalize font-medium">{color}</span>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => handleRemoveColor(color)} className="text-red-500 text-sm">
-                        Remove Color
-                      </button>
-                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => handleRemoveColor(color)} 
+                      className="text-red-500 text-sm px-2 py-1"
+                    >
+                      Remove
+                    </button>
                   </div>
 
                   <label className="block text-sm mb-2">Attach image for {color}</label>
@@ -456,31 +475,33 @@ const Add = ({ token }) => {
                     type="file"
                     accept="image/*"
                     onChange={(e) => handleImageChange(color, e.target.files?.[0])}
-                    className="block w-full text-sm mb-2"
+                    className="block w-full text-sm mb-3 p-2 border rounded"
                   />
 
                   {file ? (
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm">
-                        <div className="font-medium">{file.name}</div>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="text-sm flex-1">
+                        <div className="font-medium truncate">{file.name}</div>
                         <div className="text-xs text-gray-500">{file.type || "unknown type"}</div>
                         <div className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</div>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <img
                           src={URL.createObjectURL(file)}
                           alt={`Preview for ${color}`}
                           className="mt-2 h-20 w-20 object-cover rounded"
                         />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveFileForColor(color)}
+                          className="text-red-500 text-sm px-2 py-1 mt-2 sm:mt-0"
+                        >
+                          Remove Image
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveFileForColor(color)}
-                        className="text-red-500 text-sm"
-                      >
-                        Remove Image
-                      </button>
                     </div>
                   ) : (
-                    <div className="text-xs text-gray-500">No image selected</div>
+                    <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">No image selected</div>
                   )}
                 </div>
               );
@@ -491,37 +512,41 @@ const Add = ({ token }) => {
         {/* FAQs */}
         <div>
           <label className="block text-sm font-medium mb-2">FAQs (optional)</label>
-          <div className="flex flex-col gap-2 mb-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
             <input
               type="text"
               placeholder="Question"
               value={faqInput.question}
               onChange={(e) => setFaqInput({ ...faqInput, question: e.target.value })}
-              className="p-2 border rounded"
+              className="p-3 border rounded-lg"
             />
             <input
               type="text"
               placeholder="Answer"
               value={faqInput.answer}
               onChange={(e) => setFaqInput({ ...faqInput, answer: e.target.value })}
-              className="p-2 border rounded"
+              className="p-3 border rounded-lg"
             />
-            <button type="button" onClick={handleAddFaq} className="bg-blue-600 text-white px-4 py-2 rounded">
-              Add FAQ
-            </button>
           </div>
+          <button 
+            type="button" 
+            onClick={handleAddFaq} 
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg mb-4"
+          >
+            Add FAQ
+          </button>
 
-          <ul className="space-y-2">
+          <ul className="space-y-3">
             {form.faqs.map((fq, idx) => (
-              <li key={idx} className="border p-2 rounded flex justify-between items-start">
-                <div>
+              <li key={idx} className="border p-3 rounded-lg flex flex-col sm:flex-row justify-between items-start gap-2">
+                <div className="flex-1">
                   <p className="font-semibold">{fq.question}</p>
-                  <p className="text-sm text-gray-600">{fq.answer}</p>
+                  <p className="text-sm text-gray-600 mt-1">{fq.answer}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleRemoveFaq(idx)}
-                  className="text-red-500 text-sm"
+                  className="text-red-500 text-sm px-3 py-1"
                 >
                   Remove
                 </button>
