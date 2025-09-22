@@ -1,8 +1,13 @@
+// src/admin/Add.jsx
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import imageCompression from "browser-image-compression";
-import { backendUrl } from "../App"; // Adjust path if needed
+import { backendUrl } from "../App"; // adjust if needed
+
+const MAX_VARIANTS = 30;
+const MAX_IMAGE_MB = 50;
+const MAX_VIDEO_MB = 100;
 
 const Add = ({ token }) => {
   const [form, setForm] = useState({
@@ -18,17 +23,18 @@ const Add = ({ token }) => {
     images: {}, // { colorName: File }
     faqs: [],
     size: "",
+    variantStocks: {}, // <-- per-variant stock { color: number }
   });
 
+  const [videoFiles, setVideoFiles] = useState({});
   const [colorInput, setColorInput] = useState("");
   const [detailInput, setDetailInput] = useState("");
   const [faqInput, setFaqInput] = useState({ question: "", answer: "" });
   const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch categories
   useEffect(() => {
-    const fetchCategories = async () => {
+    (async () => {
       try {
         const res = await axios.get(`${backendUrl}/api/category/list`);
         setCategories(res.data.categories || []);
@@ -36,215 +42,155 @@ const Add = ({ token }) => {
         console.error("Error fetching categories:", err);
         toast.error("Failed to fetch categories");
       }
-    };
-    fetchCategories();
+    })();
   }, []);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+    setForm((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
   };
 
-  // Details (bullet points)
+  // details
   const handleAddDetail = () => {
     const text = detailInput.trim();
-    if (text && !form.details.includes(text)) {
-      setForm((prev) => ({ ...prev, details: [...prev.details, text] }));
-      setDetailInput("");
-    }
+    if (!text) return toast.error("Detail is empty");
+    if (form.details.includes(text)) return toast.warn("Detail already added");
+    setForm((prev) => ({ ...prev, details: [...prev.details, text] }));
+    setDetailInput("");
   };
-  const handleRemoveDetail = (d) =>
-    setForm((prev) => ({ ...prev, details: prev.details.filter((x) => x !== d) }));
+  const handleRemoveDetail = (d) => setForm((prev) => ({ ...prev, details: prev.details.filter((x) => x !== d) }));
 
-  // Colors
+  // faqs
+  const handleAddFaq = () => {
+    if (!faqInput.question.trim() || !faqInput.answer.trim()) return toast.error("Provide both question and answer");
+    setForm((prev) => ({ ...prev, faqs: [...prev.faqs, { ...faqInput }] }));
+    setFaqInput({ question: "", answer: "" });
+  };
+  const handleRemoveFaq = (idx) => setForm((prev) => ({ ...prev, faqs: prev.faqs.filter((_, i) => i !== idx) }));
+
+  // colors
   const handleAddColor = () => {
     const color = colorInput.trim().toLowerCase();
-    if (!color) {
-      toast.error("Please enter a color name");
-      return;
-    }
-    if (!form.colors.includes(color)) {
-      setForm((prev) => ({ ...prev, colors: [...prev.colors, color] }));
-    }
+    if (!color) return toast.error("Enter color name");
+    if (form.colors.includes(color)) return toast.warn("Color already exists");
+    if (form.colors.length >= MAX_VARIANTS) return toast.error(`Max ${MAX_VARIANTS} variants allowed`);
+    setForm((prev) => ({
+      ...prev,
+      colors: [...prev.colors, color],
+      variantStocks: { ...prev.variantStocks, [color]: 0 }, // default stock
+    }));
     setColorInput("");
   };
   const handleRemoveColor = (color) => {
     setForm((prev) => {
       const images = { ...prev.images };
       delete images[color];
-      return {
-        ...prev,
-        colors: prev.colors.filter((c) => c !== color),
-        images,
-      };
+      const stocks = { ...prev.variantStocks };
+      delete stocks[color];
+      return { ...prev, colors: prev.colors.filter((c) => c !== color), images, variantStocks: stocks };
+    });
+    setVideoFiles((prev) => {
+      const copy = { ...prev };
+      delete copy[color];
+      return copy;
     });
   };
 
-  // File change (compress and validate images)
+  // image change handler
   const handleImageChange = async (color, file) => {
-    if (!file) {
-      console.log("No file selected for color", color);
-      toast.error("No file selected");
-      return;
-    }
+    if (!file) return toast.error("No file selected");
+    if (!file.type.startsWith("image/")) return toast.error("Please select a valid image file");
+    if (file.size > MAX_IMAGE_MB * 1024 * 1024) return toast.error(`Image exceeds ${MAX_IMAGE_MB}MB limit`);
 
-    // Compress image if larger than 1MB
-    let processedFile = file;
+    let processed = file;
     if (file.size > 1 * 1024 * 1024) {
       try {
-        processedFile = await imageCompression(file, {
+        processed = await imageCompression(file, {
           maxSizeMB: 1,
           maxWidthOrHeight: 1920,
+          useWebWorker: true,
         });
-        console.log(`Compressed ${file.name} from ${(file.size / 1024).toFixed(1)} KB to ${(processedFile.size / 1024).toFixed(1)} KB`);
-      } catch (err) {
-        toast.error(`Failed to compress image: ${file.name}`);
-        return;
+      } catch {
+        processed = file;
       }
     }
 
-    // Validate file size (match backend limit of 50MB)
-    const maxSizeMB = 50;
-    if (processedFile.size > maxSizeMB * 1024 * 1024) {
-      toast.error(`File "${processedFile.name}" exceeds ${maxSizeMB}MB limit`);
-      return;
-    }
-
-    // Validate image
-    const img = new Image();
-    img.src = URL.createObjectURL(processedFile);
-    img.onload = () => {
-      console.log(`Image ${processedFile.name} dimensions: ${img.width}x${img.height}`);
-      if (img.width < 300 || img.height < 300) {
-        toast.warn(`Image "${processedFile.name}" is low resolution (${img.width}x${img.height})`);
-      }
-      URL.revokeObjectURL(img.src);
-    };
-    img.onerror = () => {
-      toast.error(`File "${processedFile.name}" is not a valid image`);
-      URL.revokeObjectURL(img.src);
-      return;
-    };
-
-    console.log("Selected file for", color, "->", processedFile.name, processedFile.type, processedFile.size);
-    setForm((prev) => ({
-      ...prev,
-      images: {
-        ...prev.images,
-        [color]: processedFile,
-      },
-    }));
+    setForm((prev) => ({ ...prev, images: { ...prev.images, [color]: processed } }));
   };
 
-  const handleRemoveFileForColor = (color) => {
-    setForm((prev) => {
-      const images = { ...prev.images };
-      delete images[color];
-      return { ...prev, images };
-    });
+  const handleVideoChange = (color, file) => {
+    if (!file) return toast.error("No video selected");
+    if (!file.type.startsWith("video/")) return toast.error("Please select a valid video file");
+    if (file.size > MAX_VIDEO_MB * 1024 * 1024) return toast.error(`Video exceeds ${MAX_VIDEO_MB}MB limit`);
+    setVideoFiles((prev) => ({ ...prev, [color]: file }));
   };
 
-  // FAQs
-  const handleAddFaq = () => {
-    if (!faqInput.question || !faqInput.answer) {
-      toast.error("Please provide both question and answer for FAQ");
-      return;
-    }
-    setForm((prev) => ({ ...prev, faqs: [...prev.faqs, faqInput] }));
-    setFaqInput({ question: "", answer: "" });
-  };
-  const handleRemoveFaq = (idx) =>
-    setForm((prev) => ({ ...prev, faqs: prev.faqs.filter((_, i) => i !== idx) }));
-
-  // Retry function for axios
   const axiosWithRetry = async (config, retries = 3, delay = 1000) => {
     for (let i = 0; i < retries; i++) {
       try {
         return await axios(config);
       } catch (err) {
         if (i === retries - 1) throw err;
-        console.warn(`Retry ${i + 1} for axios request: ${err.message}`);
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        await new Promise((r) => setTimeout(r, delay));
       }
     }
   };
 
-  // Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // Validate that each color has an image
-      const missingImages = form.colors.filter((color) => !form.images[color]);
+      if (!form.name || !form.price || !form.category || !form.stock) {
+        toast.error("Please fill required fields (name, price, category, stock)");
+        setIsLoading(false);
+        return;
+      }
+      if (form.colors.length === 0) {
+        toast.error("Please add at least one color variant");
+        setIsLoading(false);
+        return;
+      }
+      const missingImages = form.colors.filter((c) => !form.images[c]);
       if (missingImages.length > 0) {
         toast.error(`Please upload images for colors: ${missingImages.join(", ")}`);
         setIsLoading(false);
         return;
       }
 
-      if (form.colors.length === 0) {
-        toast.error("Please add at least one color variant");
-        setIsLoading(false);
-        return;
-      }
-
-      if (form.colors.length > 30) {
-        toast.error("Maximum 30 color variants allowed");
-        setIsLoading(false);
-        return;
-      }
-
       const formData = new FormData();
-
-      // Append scalar fields
-      const scalarFields = {
+      Object.entries({
         name: form.name,
         price: form.price,
-        category: form.category,
-        subcategory: form.subcategory,
+        category: (form.category || "").toLowerCase(),
+        subcategory: (form.subcategory || "").toLowerCase(),
         stock: form.stock,
         bestseller: form.bestseller,
         description: form.description,
         size: form.size,
-      };
+      }).forEach(([k, v]) => formData.append(k, String(v ?? "")));
 
-      Object.entries(scalarFields).forEach(([key, value]) => {
-        formData.append(key, value === undefined || value === null ? "" : String(value));
-      });
-
-      // Append arrays as JSON
       formData.append("details", JSON.stringify(form.details || []));
       formData.append("faqs", JSON.stringify(form.faqs || []));
       formData.append("colors", JSON.stringify(form.colors || []));
+      formData.append(
+        "variantStocks",
+        JSON.stringify(form.colors.map((c) => form.variantStocks?.[c] || 0))
+      );
 
-      // Append variant images
       form.colors.forEach((color, i) => {
-        const file = form.images[color];
-        if (file) {
-          formData.append(`variantImage${i}`, file);
-          console.log(`Appended variantImage${i}: ${file.name} (${(file.size / 1024).toFixed(1)} KB) for color ${color}`);
-        }
+        const imageFile = form.images[color];
+        if (imageFile) formData.append(`variantImage${i}`, imageFile, imageFile.name);
+        const videoFile = videoFiles[color];
+        if (videoFile) formData.append(`variantVideo${i}`, videoFile, videoFile.name);
       });
-
-      // Debug FormData
-      console.log("FormData entries:");
-      for (const [key, value] of formData.entries()) {
-        console.log(`${key}: ${value instanceof File ? `${value.name} (${(value.size / 1024).toFixed(1)} KB)` : value}`);
-      }
 
       const response = await axiosWithRetry({
         method: "post",
         url: `${backendUrl}/api/product/add`,
         data: formData,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
-        },
-        timeout: 600000, // 10 minutes
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 10 * 60 * 1000,
       });
 
       toast.success(response.data?.message || "Product added successfully!");
@@ -261,19 +207,11 @@ const Add = ({ token }) => {
         images: {},
         faqs: [],
         size: "",
+        variantStocks: {},
       });
+      setVideoFiles({});
     } catch (err) {
-      console.error("Error submitting form:", err);
-      if (err.response) {
-        console.error("Server response:", err.response.status, err.response.data);
-        toast.error(err.response.data?.message || `Failed (${err.response.status})`);
-      } else if (err.code === "ECONNABORTED") {
-        toast.error("Request timed out. Try smaller images or check your network.");
-      } else if (err.code === "ERR_NETWORK") {
-        toast.error("Network error. Please check your connection and try again.");
-      } else {
-        toast.error(err.message || "Failed to upload product");
-      }
+      toast.error(err.response?.data?.message || err.message);
     } finally {
       setIsLoading(false);
     }
@@ -284,103 +222,50 @@ const Add = ({ token }) => {
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Add New Product</h2>
 
       <form onSubmit={handleSubmit} encType="multipart/form-data" className="space-y-6">
-        {/* Basic Information */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-          <div className="md:col-span-2">
-            <h3 className="text-lg font-medium text-gray-700 mb-3">Basic Information</h3>
-          </div>
-          
+        {/* Basic Info */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Product Name*</label>
-            <input
-              name="name"
-              value={form.name}
-              onChange={handleInputChange}
-              className="w-full p-3 border rounded-lg"
-              required
-            />
+            <input name="name" value={form.name} onChange={handleInputChange} className="w-full p-3 border rounded-lg" required />
           </div>
-          
           <div>
             <label className="block text-sm font-medium mb-1">Price*</label>
-            <input
-              name="price"
-              type="number"
-              value={form.price}
-              onChange={handleInputChange}
-              className="w-full p-3 border rounded-lg"
-              required
-            />
+            <input name="price" type="number" value={form.price} onChange={handleInputChange} className="w-full p-3 border rounded-lg" required />
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-1">Category*</label>
-            <select
-              name="category"
-              value={form.category}
-              onChange={handleInputChange}
-              className="w-full p-3 border rounded-lg"
-              required
-            >
+            <select name="category" value={form.category} onChange={handleInputChange} className="w-full p-3 border rounded-lg" required>
               <option value="">Select Category</option>
               {categories.map((cat) => (
-                <option key={cat._id} value={cat.name}>
-                  {cat.name}
-                </option>
+                <option key={cat._id} value={cat.name}>{cat.name}</option>
               ))}
             </select>
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-1">Subcategory</label>
-            <select
-              name="subcategory"
-              value={form.subcategory}
-              onChange={handleInputChange}
-              className="w-full p-3 border rounded-lg"
-              disabled={!form.category}
-            >
+            <select name="subcategory" value={form.subcategory} onChange={handleInputChange} className="w-full p-3 border rounded-lg" disabled={!form.category}>
               <option value="">Select Subcategory</option>
-              {categories
-                .find((c) => c.name === form.category)
-                ?.subcategories.map((sub, i) => (
-                  <option key={i} value={sub}>
-                    {sub}
-                  </option>
-                ))}
+              {categories.find((c) => c.name === form.category)?.subcategories?.map((sub, i) => (
+                <option key={i} value={sub}>{sub}</option>
+              ))}
             </select>
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-1">Stock*</label>
-            <input
-              name="stock"
-              type="number"
-              value={form.stock}
-              onChange={handleInputChange}
-              className="w-full p-3 border rounded-lg"
-              required
-            />
+            <input name="stock" type="number" min="0" value={form.stock} onChange={handleInputChange} className="w-full p-3 border rounded-lg" required />
+            <div className="text-xs text-gray-500 mt-1">This is the default global stock for variants unless you set per-variant stock below.</div>
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-1">Size</label>
-            <input
-              name="size"
-              value={form.size}
-              onChange={handleInputChange}
-              className="w-full p-3 border rounded-lg"
-            />
+            <input name="size" value={form.size} onChange={handleInputChange} className="w-full p-3 border rounded-lg" />
           </div>
 
-          <div className="flex items-center md:col-span-2">
-            <input
-              type="checkbox"
-              name="bestseller"
-              checked={form.bestseller}
-              onChange={handleInputChange}
-              className="h-5 w-5"
-            />
+          <div className="flex items-center">
+            <input type="checkbox" name="bestseller" checked={form.bestseller} onChange={handleInputChange} className="h-5 w-5" />
             <label className="ml-2 text-sm">Mark as Bestseller</label>
           </div>
         </div>
@@ -388,121 +273,79 @@ const Add = ({ token }) => {
         {/* Description */}
         <div>
           <label className="block text-sm font-medium mb-1">Description*</label>
-          <textarea
-            name="description"
-            value={form.description}
-            onChange={handleInputChange}
-            rows={3}
-            className="w-full p-3 border rounded-lg"
-            required
-          />
+          <textarea name="description" value={form.description} onChange={handleInputChange} rows={3} className="w-full p-3 border rounded-lg" required />
         </div>
 
         {/* Details */}
         <div>
           <label className="block text-sm font-medium mb-2">Product Details</label>
-          <div className="flex flex-col sm:flex-row gap-2 mb-3">
-            <input
-              type="text"
-              placeholder="Slim fit, 100% cotton..."
-              className="flex-1 p-3 border rounded-lg"
-              value={detailInput}
-              onChange={(e) => setDetailInput(e.target.value)}
-            />
-            <button 
-              type="button" 
-              onClick={handleAddDetail} 
-              className="bg-blue-600 text-white px-4 py-3 sm:py-2 rounded-lg"
-            >
-              Add Detail
-            </button>
+          <div className="flex gap-2 mb-3">
+            <input type="text" value={detailInput} onChange={(e) => setDetailInput(e.target.value)} placeholder="Add bullet point" className="flex-1 p-3 border rounded-lg" />
+            <button type="button" onClick={handleAddDetail} className="bg-blue-600 text-white px-4 py-2 rounded-lg">Add</button>
           </div>
           <ul className="space-y-2">
             {form.details.map((d, i) => (
               <li key={i} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
                 <span>{d}</span>
-                <button 
-                  type="button" 
-                  onClick={() => handleRemoveDetail(d)} 
-                  className="text-red-500 text-sm px-2 py-1"
-                >
-                  Remove
-                </button>
+                <button type="button" onClick={() => handleRemoveDetail(d)} className="text-red-500 text-sm">Remove</button>
               </li>
             ))}
           </ul>
         </div>
 
-        {/* Colors & Media */}
-        <div>
+        {/* Color variants (images + optional video + per-variant stock) */}
+       <div>
           <label className="block text-sm font-medium mb-2">Color Variants</label>
-
-          <div className="flex flex-col sm:flex-row gap-2 mb-4">
+          <div className="flex gap-2 mb-4">
             <input
               type="text"
               value={colorInput}
               onChange={(e) => setColorInput(e.target.value)}
-              placeholder="Enter color name (e.g., gold, black)"
+              placeholder="Enter color name"
               className="flex-1 p-3 border rounded-lg"
             />
-            <button 
-              type="button" 
-              onClick={handleAddColor} 
-              className="bg-blue-600 text-white px-4 py-3 sm:py-2 rounded-lg"
-            >
+            <button type="button" onClick={handleAddColor} className="bg-blue-600 text-white px-4 py-2 rounded-lg">
               Add Color
             </button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {form.colors.map((color) => {
-              const file = form.images[color];
+            {form.colors.map((color, idx) => {
+              const imgFile = form.images[color];
+              const vidFile = videoFiles[color];
               return (
                 <div key={color} className="border p-4 rounded-lg">
                   <div className="flex justify-between items-center mb-3">
                     <span className="capitalize font-medium">{color}</span>
-                    <button 
-                      type="button" 
-                      onClick={() => handleRemoveColor(color)} 
-                      className="text-red-500 text-sm px-2 py-1"
-                    >
+                    <button type="button" onClick={() => handleRemoveColor(color)} className="text-red-500 text-sm">
                       Remove
                     </button>
                   </div>
 
-                  <label className="block text-sm mb-2">Attach image for {color}</label>
+                  {/* Stock input */}
+                  <label className="block text-sm mb-1">Stock for {color}</label>
                   <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleImageChange(color, e.target.files?.[0])}
+                    type="number"
+                    min="0"
+                    value={form.variantStocks?.[color] || ""}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        variantStocks: { ...prev.variantStocks, [color]: Number(e.target.value) || 0 },
+                      }))
+                    }
                     className="block w-full text-sm mb-3 p-2 border rounded"
                   />
 
-                  {file ? (
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div className="text-sm flex-1">
-                        <div className="font-medium truncate">{file.name}</div>
-                        <div className="text-xs text-gray-500">{file.type || "unknown type"}</div>
-                        <div className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</div>
-                      </div>
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <img
-                          src={URL.createObjectURL(file)}
-                          alt={`Preview for ${color}`}
-                          className="mt-2 h-20 w-20 object-cover rounded"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveFileForColor(color)}
-                          className="text-red-500 text-sm px-2 py-1 mt-2 sm:mt-0"
-                        >
-                          Remove Image
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">No image selected</div>
-                  )}
+                  {/* Image input */}
+                  <label className="block text-sm mb-2">Image *</label>
+                  <input type="file" accept="image/*" onChange={(e) => handleImageChange(color, e.target.files?.[0])} />
+                  {imgFile && <img src={URL.createObjectURL(imgFile)} alt="" className="h-20 mt-2 object-cover" />}
+
+                  {/* Video input */}
+                  <label className="block text-sm mt-3 mb-2">Video (optional)</label>
+                  <input type="file" accept="video/*" onChange={(e) => handleVideoChange(color, e.target.files?.[0])} />
+                  {vidFile && <video src={URL.createObjectURL(vidFile)} className="h-32 mt-2" controls />}
                 </div>
               );
             })}
@@ -513,43 +356,19 @@ const Add = ({ token }) => {
         <div>
           <label className="block text-sm font-medium mb-2">FAQs (optional)</label>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-            <input
-              type="text"
-              placeholder="Question"
-              value={faqInput.question}
-              onChange={(e) => setFaqInput({ ...faqInput, question: e.target.value })}
-              className="p-3 border rounded-lg"
-            />
-            <input
-              type="text"
-              placeholder="Answer"
-              value={faqInput.answer}
-              onChange={(e) => setFaqInput({ ...faqInput, answer: e.target.value })}
-              className="p-3 border rounded-lg"
-            />
+            <input type="text" placeholder="Question" value={faqInput.question} onChange={(e) => setFaqInput({ ...faqInput, question: e.target.value })} className="p-3 border rounded-lg" />
+            <input type="text" placeholder="Answer" value={faqInput.answer} onChange={(e) => setFaqInput({ ...faqInput, answer: e.target.value })} className="p-3 border rounded-lg" />
           </div>
-          <button 
-            type="button" 
-            onClick={handleAddFaq} 
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg mb-4"
-          >
-            Add FAQ
-          </button>
+          <button type="button" onClick={handleAddFaq} className="bg-blue-600 text-white px-4 py-2 rounded-lg mb-4">Add FAQ</button>
 
           <ul className="space-y-3">
             {form.faqs.map((fq, idx) => (
-              <li key={idx} className="border p-3 rounded-lg flex flex-col sm:flex-row justify-between items-start gap-2">
-                <div className="flex-1">
+              <li key={idx} className="border p-3 rounded-lg flex justify-between items-start">
+                <div>
                   <p className="font-semibold">{fq.question}</p>
                   <p className="text-sm text-gray-600 mt-1">{fq.answer}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveFaq(idx)}
-                  className="text-red-500 text-sm px-3 py-1"
-                >
-                  Remove
-                </button>
+                <button type="button" onClick={() => handleRemoveFaq(idx)} className="text-red-500 text-sm">Remove</button>
               </li>
             ))}
           </ul>
@@ -557,15 +376,15 @@ const Add = ({ token }) => {
 
         {/* Submit */}
         <div className="pt-4">
-          <button
-            type="submit"
-            disabled={isLoading}
-            className={`w-full py-3 px-6 rounded-lg font-medium text-white ${
-              isLoading ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
-            }`}
-          >
-            {isLoading ? "Processing..." : "Add Product"}
-          </button>
+           <button
+          type="submit"
+          disabled={isLoading}
+          className={`w-full py-3 px-6 rounded-lg font-medium text-white ${
+            isLoading ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"
+          }`}
+        >
+          {isLoading ? "Processing..." : "Add Product"}
+        </button>
         </div>
       </form>
     </div>
