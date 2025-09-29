@@ -136,6 +136,27 @@ const Edit = ({ token }) => {
     setForm((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
   };
 
+  const normalizeColor = (s) => String(s || "").trim().toLowerCase();
+
+const commitVariantColor = (index) => {
+  const raw = variants[index]?.color;
+  const next = normalizeColor(raw);
+  if (!next) {
+    toast.error("Enter a valid color");
+    return;
+  }
+  // prevent duplicate colors among non-removed variants
+  const dup = variants.some(
+    (v, i) => !v.removed && i !== index && normalizeColor(v.color) === next
+  );
+  if (dup) {
+    toast.warn(`"${next}" already exists`);
+    return;
+  }
+  // write back normalized value
+  updateVariantAt(index, { color: next });
+};
+
   // Details management
   const handleAddDetail = () => {
     const t = detailInput.trim();
@@ -441,7 +462,20 @@ const Edit = ({ token }) => {
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <div className="flex gap-2 items-center">
-                      <input className="p-2 border rounded w-48" value={v.color} onChange={(e) => handleVariantColorChange(idx, e.target.value)} disabled={v.removed} />
+                      <input
+  className="p-2 border rounded w-48"
+  value={v.color}
+  onChange={(e) => handleVariantColorChange(idx, e.target.value)}
+  onKeyDown={(e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commitVariantColor(idx);
+    }
+  }}
+  onBlur={() => commitVariantColor(idx)}
+  disabled={v.removed}
+/>
+
                       <input type="number" className="p-2 border rounded w-28" value={v.stock} onChange={(e) => handleVariantStockChange(idx, e.target.value)} disabled={v.removed} min="0" />
                       <span className="text-xs text-gray-500">Stock</span>
                     </div>

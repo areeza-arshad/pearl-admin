@@ -34,6 +34,7 @@ const Add = ({ token }) => {
   const [faqInput, setFaqInput] = useState({ question: "", answer: "" });
   const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [colorEdits, setColorEdits] = useState({});
 
   useEffect(() => {
     (async () => {
@@ -70,7 +71,60 @@ const Add = ({ token }) => {
   };
   const handleRemoveFaq = (idx) => setForm((prev) => ({ ...prev, faqs: prev.faqs.filter((_, i) => i !== idx) }));
 
+
+
   // colors
+
+  const renameVariantColor = (oldColor, nextRaw) => {
+  const newColor = String(nextRaw || "").trim().toLowerCase();
+  if (!newColor) return toast.error("Enter a valid color name");
+  if (newColor === oldColor) return; // nothing to do
+
+  setForm((prev) => {
+    if (prev.colors.includes(newColor)) {
+      toast.warn(`"${newColor}" already exists`);
+      return prev;
+    }
+
+    // update colors array
+    const colors = prev.colors.map((c) => (c === oldColor ? newColor : c));
+
+    // move image file reference
+    const images = { ...prev.images };
+    if (images[oldColor]) {
+      images[newColor] = images[oldColor];
+      delete images[oldColor];
+    }
+
+    // move per-variant stock
+    const variantStocks = { ...prev.variantStocks };
+    if (Object.prototype.hasOwnProperty.call(variantStocks, oldColor)) {
+      variantStocks[newColor] = variantStocks[oldColor];
+      delete variantStocks[oldColor];
+    }
+
+    return { ...prev, colors, images, variantStocks };
+  });
+
+  // move video file reference too
+  setVideoFiles((prev) => {
+    const copy = { ...prev };
+    if (copy[oldColor]) {
+      copy[newColor] = copy[oldColor];
+      delete copy[oldColor];
+    }
+    return copy;
+  });
+
+  // clean the temp edit input for the old key
+  setColorEdits((prev) => {
+    const copy = { ...prev };
+    delete copy[oldColor];
+    return copy;
+  });
+
+  toast.success(`Color changed to "${newColor}"`);
+};
   const handleAddColor = () => {
     const color = colorInput.trim().toLowerCase();
     if (!color) return toast.error("Enter color name");
@@ -337,11 +391,40 @@ if (missingMedia.length > 0) {
               return (
                 <div key={color} className="border p-4 rounded-lg">
                   <div className="flex justify-between items-center mb-3">
-                    <span className="capitalize font-medium">{color}</span>
-                    <button type="button" onClick={() => handleRemoveColor(color)} className="text-red-500 text-sm">
-                      Remove
-                    </button>
-                  </div>
+  {/* Editable color name */}
+  <div className="flex items-center gap-2">
+    <input
+      className="capitalize font-medium border rounded px-2 py-1 text-sm"
+      value={colorEdits[color] ?? color}
+      onChange={(e) =>
+        setColorEdits((prev) => ({ ...prev, [color]: e.target.value }))
+      }
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          renameVariantColor(color, colorEdits[color] ?? color);
+        }
+      }}
+    />
+    <button
+      type="button"
+      onClick={() => renameVariantColor(color, colorEdits[color] ?? color)}
+      className="text-blue-600 text-xs underline"
+      title="Apply new color name"
+    >
+      Apply
+    </button>
+  </div>
+
+  <button
+    type="button"
+    onClick={() => handleRemoveColor(color)}
+    className="text-red-500 text-sm"
+  >
+    Remove
+  </button>
+</div>
+
 
                   {/* Stock input */}
                   <label className="block text-sm mb-1">Stock for {color}</label>
