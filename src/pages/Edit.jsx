@@ -4,6 +4,7 @@ import axios from "axios";
 import { backendUrl } from "../App"; // adjust if you export this; otherwise replace with env var
 import { toast } from "react-toastify";
 import { useParams, useNavigate } from "react-router-dom";
+import { compressVideo } from "../utils/compressVideo";
 
 /**
  * Edit product component
@@ -17,7 +18,7 @@ const Edit = ({ token }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingDetailIdx, setEditingDetailIdx] = useState(null);
 const [editingDetailValue, setEditingDetailValue] = useState("");
-
+const [isCompressing, setIsCompressing] = useState(false)
   // product-level fields
   const [form, setForm] = useState({
     name: "",
@@ -262,7 +263,10 @@ const commitVariantColor = (index) => {
       toast.error("Please fill required fields (name, price, category)");
       return;
     }
-
+   if(isCompressing){
+        toast.error("Please wait for compression to finish")
+        return
+      }
     // Ensure every non-removed variant has an image (either existing URL or newImageFile)
     const activeVariants = variants.filter((v) => !v.removed);
     if (activeVariants.length === 0) {
@@ -561,12 +565,36 @@ const commitVariantColor = (index) => {
 
                       <div className="w-36">
                         <label className="block text-xs">Replace Video (optional)</label>
-                        <input type="file" accept="video/*" onChange={(e) => handleVariantVideoFile(idx, e.target.files?.[0] || null)} disabled={v.removed} />
-                        {v.newVideoFile ? (
-                          <video src={URL.createObjectURL(v.newVideoFile)} className="mt-2 h-16 w-full object-cover" controls />
-                        ) : v.videos?.[0] ? (
-                          <video src={v.videos[0]} className="mt-2 h-16 w-full object-cover" controls />
-                        ) : null}
+
+<input 
+  type="file" 
+  accept="video/*" 
+  onChange={async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    console.log(file)
+     setIsCompressing(true)
+    // Compress if >5MB
+    if (file.size > 5 * 1024 * 1024) {
+      toast.info("Compressing video...");
+      try {
+        // console.log("here")
+        const compressed = await compressVideo(file); 
+        toast.success(`✅ Compression Successful`);
+        setIsCompressing(false)
+        handleVariantVideoFile(idx, compressed);
+      } catch (err) {
+        // console.log(err)
+        toast.error("Using original");
+        handleVariantVideoFile(idx, file);
+      }
+    } else {
+      handleVariantVideoFile(idx, file);
+    }
+  }} 
+  disabled={v.removed}
+/>
+
                       </div>
                     </div>
                   </div>

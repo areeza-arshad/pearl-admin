@@ -4,6 +4,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 
 import { backendUrl } from "../App"; // adjust if needed
+import { compressVideo } from "../utils/compressVideo";
 
 const MAX_VARIANTS = 30;
 const MAX_IMAGE_MB = 50;
@@ -39,6 +40,7 @@ const Add = ({ token }) => {
 const [editingDetailValue, setEditingDetailValue] = useState("");
 const [editingFaqIdx, setEditingFaqIdx] = useState(null);
 const [editingFaq, setEditingFaq] = useState({ question: "", answer: "" });
+const [isCompressing, setIsCompressing] = useState(false);
 
 
 
@@ -226,12 +228,30 @@ const cancelDetailEdit = () => {
 
 
 
-  const handleVideoChange = (color, file) => {
-    if (!file) return toast.error("No video selected");
-    if (!file.type.startsWith("video/")) return toast.error("Please select a valid video file");
-    if (file.size > MAX_VIDEO_MB * 1024 * 1024) return toast.error(`Video exceeds ${MAX_VIDEO_MB}MB limit`);
+const handleVideoChange = async (color, file) => {
+  if (!file) return;
+
+  setIsCompressing(true);
+  try {
+    toast.info("Compressing video...");
+
+    const compressed = await compressVideo(file);
+
+    if (compressed.size >= file.size * 0.95) {
+      toast.warning("Compression not effective, using original video");
+      setVideoFiles((prev) => ({ ...prev, [color]: file }));
+    } else {
+      toast.success("✅ Video compressed successfully");
+      setVideoFiles((prev) => ({ ...prev, [color]: compressed }));
+    }
+  } catch (err) {
+    toast.error("Compression failed, using original");
     setVideoFiles((prev) => ({ ...prev, [color]: file }));
-  };
+  } finally {
+    setIsCompressing(false);
+  }
+};
+
 
   
 
@@ -255,6 +275,10 @@ const cancelDetailEdit = () => {
         toast.error("Please fill required fields (name, price, category, stock)");
         setIsLoading(false);
         return;
+      }
+      if(isCompressing){
+        toast.error("Please wait for compression to finish")
+        return
       }
       if (form.colors.length === 0) {
         toast.error("Please add at least one color variant");
