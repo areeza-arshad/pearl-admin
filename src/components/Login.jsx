@@ -11,7 +11,7 @@ const Login = ({ setToken }) => {
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
-    setError(''); // Clear error when user starts typing
+    setError(''); // Clear error when user starts typing...
   };
 
   const handleSubmit = async (e) => {
