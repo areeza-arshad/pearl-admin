@@ -19,7 +19,8 @@ const Add = ({ token }) => {
     description: "",
     details: [],
     colors: [],
-    images: {}, // { colorName: File }
+    images: {},
+    uploadedImages: {},
     faqs: [],
     size: "",
     variantStocks: {},
@@ -48,7 +49,7 @@ const Add = ({ token }) => {
         toast.error("Failed to fetch categories");
       }
     })();
-  }, []);
+  }, []); 
 
   const beginEditFaq = (idx) => {
     setEditingFaqIdx(idx);
@@ -199,18 +200,20 @@ const Add = ({ token }) => {
     });
   };
 
-  // image change handler
   const handleImageChange = (color, file) => {
     if (!file) return toast.error("No file selected");
     if (!file.type.startsWith("image/")) return toast.error("Please select a valid image file");
     if (file.size > MAX_IMAGE_MB * 1024 * 1024)
       return toast.error(`Image exceeds ${MAX_IMAGE_MB}MB limit`);
 
-    setForm((prev) => ({
+    // Local preview only
+
+    setForm(prev => ({
       ...prev,
       images: { ...prev.images, [color]: file },
     }));
   };
+
 
   // ✅ SIMPLE VIDEO UPLOAD - NO COMPRESSION
   const handleVideoChange = (color, file) => {
@@ -246,6 +249,7 @@ const Add = ({ token }) => {
       }
     }
   };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -303,14 +307,23 @@ const Add = ({ token }) => {
         const imageFile = form.images[color];
         const videoFile = videoFiles[color];
         
-        if (imageFile) {
+        if (imageFile instanceof File) {
           formData.append(`variantImage${index}`, imageFile);
         }
         
-        if (videoFile) {
+        if (videoFile instanceof File) {
           formData.append(`variantVideo${index}`, videoFile);
         }
       });
+      
+      // Get token from localStorage
+      const token = localStorage.getItem("adminToken");
+      if (!token) {
+        toast.error("Admin not logged in or token missing");
+        console.error("No admin token found in localStorage!");
+        setIsLoading(false);
+        return;
+      }
 
       // Submit to backend
       const response = await axiosWithRetry({
@@ -318,15 +331,37 @@ const Add = ({ token }) => {
         url: `${backendUrl}/api/product/add`,
         data: formData,
         headers: { 
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data"
+          Authorization: `Bearer ${token}`
         },
         timeout: 10 * 60 * 1000, // 10 minutes timeout
       });
 
+      console.log("Backend response:", response.data);
+      
+      // Extract image URLs from variants
+      
+      const variants = response.data?.product?.variants || [];
+      const variantColors = variants.map(v => v.color);
+      let uploadedImages = {};
+      
+      variants.forEach((variant) => {
+        const color = variant.color;
+        const images = variant.images || [];
+        
+        if (color && images.length > 0) {
+          // Use the first image in the array
+          uploadedImages[color] = images[0];
+          console.log(`Extracted image for ${color}:`, images[0]);
+        }
+      });
+      console.log("Extracted colors:", variantColors);
+      console.log("Extracted images:", uploadedImages);
+      
+      console.log("All extracted images:", uploadedImages);
+
       toast.success(response.data?.message || "Product added successfully!");
       
-      // Reset form
+      // Reset form with uploaded image URLs
       setForm({
         name: "",
         price: "",
@@ -337,16 +372,23 @@ const Add = ({ token }) => {
         description: "",
         details: [],
         colors: [],
-        images: {},
+        images: {}, // Clear local files
+        uploadedImages: {}, 
         faqs: [],
         size: "",
         variantStocks: {},
         difficulty: "easy"
       });
+      
       setVideoFiles({});
       setColorInput("");
       setDetailInput("");
       setFaqInput({ question: "", answer: "" });
+      
+      // Show additional success if images were uploaded
+      if (Object.keys(uploadedImages).length > 0) {
+        toast.success(`${Object.keys(uploadedImages).length} image(s) uploaded to ImageKit`);
+      }
       
     } catch (err) {
       console.error("Add product error:", err);
@@ -355,6 +397,9 @@ const Add = ({ token }) => {
       setIsLoading(false);
     }
   };
+
+
+
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 bg-white rounded-xl shadow-lg">
@@ -510,7 +555,7 @@ const Add = ({ token }) => {
                           }
                         }}
                       />
-                      <button type="button" onClick={() => renameVariantColor(color, colorEdits[color] ?? color)} className="text-blue-600 text-xs underline" title="Apply new color name">Apply</button>
+                      <button type="button" onClick={() => { console.log("Apply clicked for", color, colorEdits[color] || color); renameVariantColor(color, colorEdits[color] || color); }}  className="text-blue-600 text-xs underline" title="Apply new color name">Apply</button>
                     </div>
                     <button type="button" onClick={() => handleRemoveColor(color)} className="text-red-500 text-sm">Remove</button>
                   </div>
@@ -527,8 +572,47 @@ const Add = ({ token }) => {
 
                   {/* Image input */}
                   <label className="block text-sm mb-2">Image *</label>
-                  <input type="file" accept="image/*" onChange={(e) => handleImageChange(color, e.target.files?.[0])} className="block w-full text-sm" />
-                  {imgFile && <img src={URL.createObjectURL(imgFile)} alt={color} className="h-20 mt-2 object-cover rounded" />}
+                  <input
+                    key={color} // ensures React resets input for each color
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                       console.log("File selected:", {
+                        exists: !!file,
+                        name: file?.name,
+                        type: file?.type,
+                        size: file?.size
+                      });
+                      handleImageChange(color, file);
+                    }}
+                    className="block w-full text-sm"
+                  />
+
+                  {form.uploadedImages?.[color] ? (
+                      <div>
+                        <img
+                          src={form.uploadedImages[color]}
+                          alt={color}
+                          className="h-20 mt-2 object-cover rounded"
+                          crossOrigin="anonymous"
+                        />
+                        <p className="text-xs text-gray-500">Uploaded to ImageKit ✓</p>
+                      </div>
+                    ) : form.images[color] ? (
+                      // Show local preview
+                      <div>
+                        <img
+                          src={URL.createObjectURL(form.images[color])}
+                          alt={color}
+                          className="h-20 mt-2 object-cover rounded"
+                          crossOrigin="anonymous"
+                        />
+                        <p className="text-xs text-gray-500">Local preview (not uploaded yet)</p>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400">No image</span>
+                    )}
 
                   {/* Video input */}
                   <label className="block text-sm mt-3 mb-2">Video (optional)</label>

@@ -22,7 +22,9 @@ const Login = ({ setToken }) => {
     try {
       const res = await axios.post(`${backendUrl}/api/user/admin`, form);
       if (res.data.token) {
-        setToken(res.data.token);
+        
+         localStorage.setItem("adminToken", res.data.token);
+         setToken(res.data.token);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid credentials. Please try again.');
