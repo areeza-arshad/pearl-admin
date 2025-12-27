@@ -16,8 +16,8 @@ const Edit = ({ token }) => {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingDetailIdx, setEditingDetailIdx] = useState(null);
-const [editingDetailValue, setEditingDetailValue] = useState("");
-const [isCompressing, setIsCompressing] = useState(false)
+  const [editingDetailValue, setEditingDetailValue] = useState("");
+  const [isCompressing, setIsCompressing] = useState(false)
   // product-level fields
   const [form, setForm] = useState({
     name: "",
@@ -383,19 +383,19 @@ const commitVariantColor = (index) => {
           </div>
 
           <div>
-  <label className="block text-sm font-medium">Difficulty*</label>
-  <select
-    name="difficulty"
-    value={form.difficulty}
-    onChange={handleInputChange}
-    className="w-full p-2 border rounded"
-    required
-  >
-    <option value="easy">Easy</option>
-    <option value="medium">Medium</option>
-    <option value="difficult">Difficult</option>
-  </select>
-</div>
+            <label className="block text-sm font-medium">Difficulty*</label>
+            <select
+              name="difficulty"
+              value={form.difficulty}
+              onChange={handleInputChange}
+              className="w-full p-2 border rounded"
+              required
+            >
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="difficult">Difficult</option>
+            </select>
+          </div>
 
 
           <div>
@@ -548,13 +548,29 @@ const commitVariantColor = (index) => {
                     <div className="mt-2 flex gap-3 items-center">
                       {/* existing image preview */}
                       <div className="w-24 h-20 bg-gray-100 rounded overflow-hidden flex items-center justify-center">
-                        {v.newImageFile ? (
+                        {/* {v.newImageFile ? (
                           <img src={URL.createObjectURL(v.newImageFile)} alt="preview" className="w-full h-full object-cover" />
                         ) : v.images?.[0] ? (
                           <img src={v.images[0]} alt="existing" className="w-full h-full object-cover" />
                         ) : (
                           <span className="text-xs text-gray-400">No image</span>
+                        )} */}
+                        {v.newImageFile ? (
+                          <img
+                            src={URL.createObjectURL(v.newImageFile)}
+                            alt="preview"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : v.uploadedImages?.[0] ? (  // ← ImageKit URL from backend
+                          <img
+                            src={v.uploadedImages[0]}
+                            alt="existing"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-xs text-gray-400">No image</span>
                         )}
+
                       </div>
 
                       <div>
